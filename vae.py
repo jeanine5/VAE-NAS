@@ -12,18 +12,18 @@ device = torch.device(device)
 
 
 class AutoEncoder(nn.Module):
-    def __init__(self, latent_dim):
+    def __init__(self, mid_layer, latent_dim):
         super().__init__()
 
         # layers
-        self.encoder = nn.Sequential(nn.Linear(80, 50),
+        self.encoder = nn.Sequential(nn.Linear(80, mid_layer),
                                      nn.ReLU(),
-                                     nn.Linear(50, latent_dim),
+                                     nn.Linear(mid_layer, latent_dim),
                                      nn.ReLU())
 
-        self.decoder = nn.Sequential(nn.Linear(latent_dim, 50),
+        self.decoder = nn.Sequential(nn.Linear(latent_dim, mid_layer),
                                      nn.ReLU(),
-                                     nn.Linear(50, 80),
+                                     nn.Linear(mid_layer, 80),
                                      nn.Sigmoid())
         # apply the sigmoid activation function to compress the output to a range of (0, 1)
 
@@ -35,8 +35,8 @@ class AutoEncoder(nn.Module):
 
 
 class VAE(AutoEncoder):
-    def __init__(self, latent_dim):
-        super().__init__(latent_dim)
+    def __init__(self, mid_layer, latent_dim):
+        super().__init__(mid_layer, latent_dim)
         # mean vector and sd vector
         self.mu = nn.Linear(latent_dim, latent_dim)
         self.log_var = nn.Linear(latent_dim, latent_dim)
@@ -72,7 +72,7 @@ class VAE(AutoEncoder):
 # Define a loss function that combines binary cross-entropy and Kullback-Leibler divergence
 def loss_function(recon_x, x, mu, logvar):
     # Compute the binary cross-entropy loss between the reconstructed output and the input data
-    BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), reduction="sum")
+    BCE = F.binary_cross_entropy(recon_x, x.view(-1, 80), reduction="sum")
     # Compute the Kullback-Leibler divergence between the learned latent variable distribution
     # and a standard Gaussian distribution
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
@@ -81,15 +81,18 @@ def loss_function(recon_x, x, mu, logvar):
 
 
 class VAEArchitectures:
-    def __init__(self, latent_dim):
-        self.model = VAE(latent_dim)
+    def __init__(self, mid_layer, latent_dim):
+        self.model = VAE(mid_layer, latent_dim)
+        self.latent_dim = latent_dim
         self.objectives = {
             'loss': 0.0,
-            'out-of-dist': 0.0
+            'OOD': 0.0
         }
+        self.nondominated_rank = 0
+        self.crowding_distance = 0.0
 
-    def train(self, train_loader, latent_dim, learning_rate=1e-3, epochs=10):
-        model = VAE(latent_dim)
+    def train(self, train_loader, mid_layer, latent_dim, learning_rate=1e-3, epochs=10):
+        model = VAE(mid_layer, latent_dim)
         optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
         for epoch in range(epochs):
@@ -112,5 +115,6 @@ class VAEArchitectures:
             print(
                 "Epoch {}/{}: loss={:.4f}".format(epoch + 1, epochs, epoch_loss)
             )
+            self.objectives['loss'] = epoch_loss
 
         return model

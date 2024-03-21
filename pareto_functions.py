@@ -5,9 +5,10 @@ used in the NSGA-II class in EcoNAS/EA/NSGA.py. Note, we have conflicting object
 """
 
 import numpy as np
+from vae import VAE, VAEArchitectures
 
 
-def get_corr_archs(front, architectures: list[NeuralArchitecture]):
+def get_corr_archs(front, architectures: list[VAEArchitectures]):
     """
     Get the architectures corresponding to the indices in the front
     :param front: list of indices
@@ -21,7 +22,7 @@ def get_corr_archs(front, architectures: list[NeuralArchitecture]):
     return corr_archs
 
 
-def crowded_comparison_operator(ind1: NeuralArchitecture, ind2: NeuralArchitecture):
+def crowded_comparison_operator(ind1: VAEArchitectures, ind2: VAEArchitectures):
     """
     Crowded comparison operator defined from Deb et al. (2002). https://ieeexplore.ieee.org/document/996017
     :param ind1: NeuralArchitecture object
@@ -36,15 +37,13 @@ def crowded_comparison_operator(ind1: NeuralArchitecture, ind2: NeuralArchitectu
         return False
 
 
-def set_non_dominated(population: list[NeuralArchitecture]):
+def set_non_dominated(population: list[VAEArchitectures]):
     """
     Set the non-dominated rank for each NeuralArchitecture object in the population
     :param population: list of NeuralArchitecture objects
     :return: None
     """
-
-    pbo = np.array([[ind.objectives['accuracy'], ind.objectives['introspectability'], ind.objectives['flops']
-                     ] for ind in population])
+    pbo = [[ind.objectives['loss'], ind.objectives['OOD']] for ind in population]
 
     for i in range(len(population)):
         for j in range(len(population)):
@@ -61,10 +60,9 @@ def is_pareto_dominant(p, q):
     :param q: list of fitness values
     :return: True if p dominates q, False otherwise
     """
-    first_two_objectives_dominate = np.all(p[:2] >= q[:2]) and np.any(p[:2] > q[:2])
-    third_objective_minimization = p[2] <= q[2]
+    dom = p[0] < q[0]
 
-    return first_two_objectives_dominate and third_objective_minimization
+    return dom
 
 
 def fast_non_dominating_sort(population):
@@ -153,4 +151,3 @@ def fronts_to_nondomination_rank(fronts):
         for x in front:
             non_domination_rank_dict[x] = i
     return non_domination_rank_dict
-
