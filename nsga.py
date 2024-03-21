@@ -3,12 +3,16 @@ This file contains the implementation of the NSGA-2 algorithm. It is a multi-obj
 that is used for the evolutionary search of neural network architectures. The algorithm is implemented in the
 NSGA_II class. The algorithm is used in EcoNAS/Training/CIFAR.py.
 """
+import csv
+
 from matplotlib import pyplot as plt
 
 from genetic_functions import *
 from pareto_functions import *
 import functools
 import numpy as np
+
+from regression_predictor import RregressionPredictor
 
 
 class NSGA_II:
@@ -36,7 +40,7 @@ class NSGA_II:
 
         return archs
 
-    def evolve(self):
+    def evolve(self, train_loader, mid_layer, latent_dim):
         """
         The NSGA-2 algorithm. It evolves the population for a given number of generations, however
         there is quite a bit of excessive training going on here.
@@ -45,6 +49,10 @@ class NSGA_II:
         :param data_name:
         :return: List of the best performing NeuralArchitecture objects of size of at most population_size
         """
+        regression_trainer = RregressionPredictor('Training_CSV.csv')
+
+        regression_trainer.train_models()
+        regression_trainer.evaluate_models()
 
         evolutionary_path = []
 
@@ -53,14 +61,9 @@ class NSGA_II:
 
         # step 2 : evaluate the objective functions for each arch
         for a in archs:
-            # TODO: modify the regression model
-            a.train()
-            # predicted_performance = regression_trainer.predict_performance(a)
-            # a.objectives = {
-            #     'accuracy': predicted_performance[0],
-            #     'introspectability': predicted_performance[1],
-            #     'flops': predicted_performance[2]
-            # }
+            a.train(train_loader, mid_layer, latent_dim)
+            results = store_results(a.latent_dim, a.mid_layer, a.objectives['loss'], a.objectives['OOD'])
+            store_results_to_csv(results, 'Training_CSV')
 
         # step 3: set the non-dominated ranks for the population and sort the architectures by rank
         set_non_dominated(archs)  # fitness vals
@@ -69,7 +72,13 @@ class NSGA_II:
         # step 4: create an offspring population Q0 of size N
         offspring_pop = generate_offspring(archs, self.crossover_factor, self.mutation_factor)
 
-        # step 5: start algorithm's counter
+        for offspring in offspring_pop:
+            offspring.train(train_loader, mid_layer, latent_dim)
+            results = store_results(offspring.latent_dim, offspring.mid_layer, offspring.objectives['loss'],
+                                    offspring.objectives['OOD'])
+            store_results_to_csv(results, 'Training_CSV')
+
+        # step 5: start algorithm's counter -> MAIN LOOP
         for generation in range(self.generations):
             print(f'Generation: {generation}')
             # step 6: combine parent and offspring population
@@ -79,15 +88,15 @@ class NSGA_II:
             population_by_objectives = [[ind.objectives['loss'], ind.objectives['OOD']] for ind in combined_population]
 
             generation_metrics = []
-            for ind in archs:
-                # Convert objectives to a dictionary for clarity
-                objectives_dict = {
-                    'loss': ind.objectives['loss'],
-                    'OOD': ind.objectives['OOD']
-                }
-                generation_metrics.append({'objectives': objectives_dict})
-
-            evolutionary_path.append(generation_metrics)
+            # for ind in archs:
+            #     # Convert objectives to a dictionary for clarity
+            #     objectives_dict = {
+            #         'loss': ind.objectives['loss'],
+            #         'OOD': ind.objectives['OOD']
+            #     }
+            #     generation_metrics.append({'objectives': objectives_dict})
+            #
+            # evolutionary_path.append(generation_metrics)
 
             # step 7:
             non_dom_fronts = fast_non_dominating_sort(population_by_objectives)
@@ -101,13 +110,6 @@ class NSGA_II:
                 # calculated crowding-distance
                 crowding_metric = crowding_distance_assignment(population_by_objectives, non_dom_fronts[i])
                 for j in range(len(corresponding_archs)):
-                    # TODO: train and predict here
-                    # predicted_performance = regression_trainer.predict_performance(corresponding_archs[j])
-                    # corresponding_archs[j].objectives = {
-                    #     'accuracy': predicted_performance[0],
-                    #     'introspectability': predicted_performance[1],
-                    #     'flops': predicted_performance[2]
-                    # }
                     corresponding_archs[j].crowding_distance = crowding_metric[j]
                 archs += corresponding_archs
                 i += 1
@@ -119,6 +121,19 @@ class NSGA_II:
             archs = archs + last_front_archs[1: self.population_size - len(archs)]
 
             offspring_pop = generate_offspring(archs, self.crossover_factor, self.mutation_factor)
+            for offspring in offspring_pop:
+                predicted_performance = regression_trainer.predict_performance(offspring)
+                offspring.objectives = {
+                    'loss': predicted_performance[0],
+                    'ood': predicted_performance[1]
+                }
+
+            # TODO: sort by some characteristic
+            offspring_pop.sort(key=functools.cmp_to_key(set_non_dominated), reverse=True)
+            # train best N/2
+            num_to_train = len(offspring_pop) // 2
+            for i in range(num_to_train):
+                offspring_pop[i].train(train_loader, mid_layer, latent_dim)
 
         plot_evolutionary_path(evolutionary_path, 'loss')
         plot_evolutionary_path(evolutionary_path, 'OOD')
@@ -142,3 +157,29 @@ def plot_evolutionary_path(evolutionary_path, metric_name):
     plt.title(f'Evolutionary Path of NSGA-2 on dataset')
     plt.legend()
     plt.show()
+
+
+def store_results(latent_dim, mid_layer, loss, ood):
+    result = {
+        'latent_dim': latent_dim,
+        'mid_layer': mid_layer,
+        'loss': loss,
+        'OOD': ood
+    }
+
+    return result
+
+
+def store_results_to_csv(results, filename):
+    with open(filename, 'a', newline='') as csvfile:
+        fieldnames = ['latent_dim', 'mid_layer', 'loss', 'OOD']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        csvfile.seek(0, 2)
+        is_empty = csvfile.tell() == 0
+
+        if is_empty:
+            writer.writeheader()
+
+        for result in results:
+            writer.writerow(result)

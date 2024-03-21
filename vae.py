@@ -84,6 +84,7 @@ class VAEArchitectures:
     def __init__(self, mid_layer, latent_dim):
         self.model = VAE(mid_layer, latent_dim)
         self.latent_dim = latent_dim
+        self.mid_layer = mid_layer
         self.objectives = {
             'loss': 0.0,
             'OOD': 0.0

@@ -66,13 +66,6 @@ def generate_offspring(population: list[VAEArchitectures], crossover_rate: float
 
         mutated_offspring = mutate(offspring, mutation_rate)
 
-        # predicted_performance = regression_trainer.predict_performance(mutated_offspring)
-        # mutated_offspring.objectives = {
-        #     'accuracy': predicted_performance[0],
-        #     'introspectability': predicted_performance[1],
-        #     'flops': predicted_performance[2]
-        # }
-
         offspring_pop.append(mutated_offspring)
 
     return offspring_pop
