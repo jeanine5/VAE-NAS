@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeRegressor
 
 
-class RregressionPredictor:
+class RegressionPredictor:
     def __init__(self, csv_filename='Training_CSV.csv'):
         self.df = pd.read_csv(csv_filename)
         self.X = self.df[['latent_dim', 'mid_layer']]

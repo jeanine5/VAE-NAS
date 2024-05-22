@@ -5,15 +5,15 @@ used in the NSGA-II class in EcoNAS/EA/NSGA.py. Note, we have conflicting object
 """
 
 import numpy as np
-from vae import VAE, VAEArchitectures
+from vae import VAEArchitecture
 
 
-def get_corr_archs(front, architectures: list[VAEArchitectures]):
+def get_corr_archs(front, architectures: list[VAEArchitecture]):
     """
     Get the architectures corresponding to the indices in the front
     :param front: list of indices
-    :param architectures: list of NeuralArchitecture objects
-    :return: list of NeuralArchitecture objects
+    :param architectures: list of VAEArchitecture objects
+    :return: list of VAEArchitecture objects
     """
     corr_archs = []
     for idx in front:
@@ -22,40 +22,36 @@ def get_corr_archs(front, architectures: list[VAEArchitectures]):
     return corr_archs
 
 
-def crowded_comparison_operator(ind1: VAEArchitectures, ind2: VAEArchitectures):
+def crowded_comparison_operator(ind1: VAEArchitecture, ind2: VAEArchitecture):
     """
     Crowded comparison operator defined from Deb et al. (2002). https://ieeexplore.ieee.org/document/996017
-    :param ind1: NeuralArchitecture object
-    :param ind2: NeuralArchitecture object
+    :param ind1: VAEArchitecture object
+    :param ind2: VAEArchitecture object
     :return: True if ind1 is better than ind2, False otherwise
     """
-    if ind1.nondominated_rank < ind2.nondominated_rank:
-        return True
-    elif ind1.nondominated_rank == ind2.nondominated_rank and ind1.crowding_distance > ind2.crowding_distance:
+    if (ind1.nondominated_rank < ind2.nondominated_rank) or (ind1.nondominated_rank == ind2.nondominated_rank and
+                                                             ind1.crowding_distance > ind2.crowding_distance):
         return True
     else:
         return False
 
 
-def set_non_dominated(population: list[VAEArchitectures]):
+def set_non_dominated_ranks(fronts, population):
     """
-    Set the non-dominated rank for each NeuralArchitecture object in the population
-    :param population: list of NeuralArchitecture objects
-    :return: None
-    """
-    pbo = [[ind.objectives['loss'], ind.objectives['OOD']] for ind in population]
+    Set non-dominated ranks for architectures based on their indices in the Pareto fronts.
 
-    for i in range(len(population)):
-        for j in range(len(population)):
-            if i != j:
-                dominates = is_pareto_dominant(pbo[i], pbo[j])
-                if not dominates:
-                    population[i].nondominated_rank += 1
+    :param fronts: List of Pareto fronts returned by fast_non_dominating_sort function.
+    :param population: Original list of architectures.
+    :return: None. The non-dominated ranks are set directly on the architectures.
+    """
+    for rank, front in enumerate(fronts):
+        for idx in front:
+            population[idx].nondominated_rank = rank
 
 
 def is_pareto_dominant(p, q):
     """
-    Check if p dominates q
+    Check if p dominates q. In other words, is p a better architecture than q, by objective values.
     :param p: list of fitness values
     :param q: list of fitness values
     :return: True if p dominates q, False otherwise
@@ -65,23 +61,24 @@ def is_pareto_dominant(p, q):
     return dom
 
 
-def fast_non_dominating_sort(population):
+def fast_non_dominating_sort(population_by_obj):
     """
     Fast non-dominated sort algorithm from Deb et al. (2002). https://ieeexplore.ieee.org/document/996017
     Code from: https://github.com/adam-katona/NSGA_2_tutorial/blob/master/NSGA_2_tutorial.ipynb
-    :param population:  list of fitness values
+    :param population_by_obj:  list of fitness values
     :return: list of Pareto fronts
     """
 
     domination_sets = []
     domination_counts = []
-    for fitnesses_1 in population:
+
+    for arch_1 in population_by_obj:
         current_domination_set = set()
         domination_counts.append(0)
-        for i, fitnesses_2 in enumerate(population):
-            if is_pareto_dominant(fitnesses_1, fitnesses_2):
+        for i, arch_2 in enumerate(population_by_obj):
+            if is_pareto_dominant(arch_1, arch_2):
                 current_domination_set.add(i)
-            elif is_pareto_dominant(fitnesses_2, fitnesses_1):
+            elif is_pareto_dominant(arch_2, arch_1):
                 domination_counts[-1] += 1
 
         domination_sets.append(current_domination_set)

@@ -6,15 +6,17 @@ functions are used in the NSGA_II class in EcoNAS/EA/NSGA.py.
 
 import random
 
-from vae import VAE, VAEArchitectures
+import torch
+
+from vae import VAEArchitecture
 
 
-def binary_tournament_selection(population: list[VAEArchitectures], tournament_size=2):
+def binary_tournament_selection(population: list[VAEArchitecture], tournament_size=2):
     """
     Perform binary tournament selection on the population
-    :param population: list of NeuralArchitecture objects
+    :param population: list of VAEArchitecture objects
     :param tournament_size: size of the tournament, default is 2 for binary tournament selection
-    :return: the NeuralArchitecture object with the best fitness value
+    :return: the VAEArchitecture object with the best fitness value
     """
 
     # select 2 parent models from population P
@@ -24,37 +26,52 @@ def binary_tournament_selection(population: list[VAEArchitectures], tournament_s
     return min(selected_parents, key=lambda arch: arch.nondominated_rank)
 
 
-def crossover(parent1: VAEArchitectures, parent2: VAEArchitectures, crossover_rate: float):
+def crossover(parent1: VAEArchitecture, parent2: VAEArchitecture, crossover_rate: float):
     """
     Perform crossover on two NeuralArchitecture objects
-    :param parent1: NeuralArchitecture object
-    :param parent2: NeuralArchitecture object
+    :param parent1: VAEArchitecture object
+    :param parent2: VAEArchitecture object
     :param crossover_rate: probability of crossover
     :return:
     """
-    ...
+    offspring = parent1.clone()
+
+    # Perform crossover for encoder and decoder weights
+    for offspring_param, parent2_param in zip(offspring.model.parameters(), parent2.model.parameters()):
+        if torch.rand(1) < crossover_rate:
+            # Take weights from parent2 with probability crossover_rate
+            offspring_param.data = parent2_param.data.clone()
+
+    return offspring
 
 
-def mutate(offspring: VAEArchitectures, mutation_factor: float):
+def mutate(offspring: VAEArchitecture, mutation_factor: float):
     """
-    Perform mutation on a NeuralArchitecture object
-    :param offspring: NeuralArchitecture object
+    Perform mutation on a VAEArchitecture object. Randomly modify the model's parameters.
+    :param offspring: VAEArchitecture object
     :param mutation_factor: probability of mutation
     :return: mutated NeuralArchitecture object
     """
-    ...
+    mutated_offspring = offspring.clone()
+
+    # Mutate encoder and decoder weights
+    for param in mutated_offspring.model.parameters():
+        if torch.rand(1) < mutation_factor:
+            param.data += torch.randn_like(param.data) * 0.1  # Adding Gaussian noise
+
+    return mutated_offspring
 
 
-def generate_offspring(population: list[VAEArchitectures], crossover_rate: float, mutation_rate: float):
+def generate_offspring(population: list[VAEArchitecture], crossover_rate: float, mutation_rate: float):
     """
     Generate offspring population using binary tournament selection, crossover, and mutation
-    :param population: list of NeuralArchitecture objects
+    :param population: list of VAEArchitecture objects
     :param crossover_rate: probability of crossover
     :param mutation_rate: probability of mutation
     :param train_loader: Data loader for the training dataset
     :param test_loader: Data loader for the testing dataset
     :param epoch: Current epoch of training
-    :return: list of NeuralArchitecture objects
+    :return: list of VAEArchitecture objects
     """
     offspring_pop = []
 
