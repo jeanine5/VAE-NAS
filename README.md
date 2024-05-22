@@ -6,7 +6,7 @@ The dataset the VAE’s are trained on are the AMASS body motion dataset. I have
 
 Some modifications were made in the evolution and genetic functions. In [genetic_functions](https://github.com/jeanine5/VAE-NAS/blob/main/genetic_functions.py), since the structure of the VAE is stricter than that of a DNN, I only “crossover” and “mutate” the parameters of the VAEs. In [nsga.py](https://github.com/jeanine5/VAE-NAS/blob/main/nsga.py), I mix computation and prediction during the main for loop. I train the initial population and the offspring, and store the values ('latent_dim', 'mid_layer', 'loss', 'OOD') to a different csv file. Then, in the main loop when the offspring population is generated again, I predict their values. Based on the predicted values, the best N//2 VAEs are trained to compute their actual values.
 
-##Future:
+## Future:
 Out-of-Distribution 
 I still need to implement the metric for calculating how well the VAE handles out-of-distribution samples (OOD). Some metrics I was looking at was log (or negative log) likelihood and log likelihood regret
 N//2 characteristic
